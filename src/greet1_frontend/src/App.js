@@ -1,40 +1,48 @@
-import { html, render } from 'lit-html';
-import { greet1_backend } from 'declarations/greet1_backend';
-import logo from './logo2.svg';
+import {createActor, greet_backend} from "../../declarations/greet_backend";
+import {AuthClient} from "@dfinity/auth-client"
+import {HttpAgent} from "@dfinity/agent";
 
-class App {
-  greeting = '';
+let actor = greet_backend;
 
-  constructor() {
-    this.#render();
-  }
-
-  #handleSubmit = async (e) => {
+const greetButton = document.getElementById("greet");
+greetButton.onclick = async (e) => {
     e.preventDefault();
-    const name = document.getElementById('name').value;
-    this.greeting = await greet1_backend.greet(name);
-    this.#render();
-  };
 
-  #render() {
-    let body = html`
-      <main>
-        <img src="${logo}" alt="DFINITY logo" />
-        <br />
-        <br />
-        <form action="#">
-          <label for="name">Enter your name: &nbsp;</label>
-          <input id="name" alt="Name" type="text" />
-          <button type="submit">Click Me!</button>
-        </form>
-        <section id="greeting">${this.greeting}</section>
-      </main>
-    `;
-    render(body, document.getElementById('root'));
-    document
-      .querySelector('form')
-      .addEventListener('submit', this.#handleSubmit);
-  }
-}
+    greetButton.setAttribute("disabled", true);
 
-export default App;
+    // Interact with backend actor, calling the greet method
+    const greeting = await actor.greet();
+
+    greetButton.removeAttribute("disabled");
+
+    document.getElementById("greeting").innerText = greeting;
+
+    return false;
+};
+
+const loginButton = document.getElementById("login");
+loginButton.onclick = async (e) => {
+    e.preventDefault();
+
+    // create an auth client
+    let authClient = await AuthClient.create();
+
+    // start the login process and wait for it to finish
+    await new Promise((resolve) => {
+        authClient.login({
+            identityProvider: process.env.II_URL,
+            onSuccess: resolve,
+        });
+    });
+
+    // At this point we're authenticated, and we can get the identity from the auth client:
+    const identity = authClient.getIdentity();
+    // Using the identity obtained from the auth client, we can create an agent to interact with the IC.
+    const agent = new HttpAgent({identity});
+    // Using the interface description of our webapp, we create an actor that we use to call the service methods.
+    actor = createActor(process.env.GREET_BACKEND_CANISTER_ID, {
+        agent,
+    });
+
+    return false;
+};%  
